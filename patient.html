@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QueueCure - Patient View</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #0f172a;
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            padding: 20px;
+            border-bottom: 2px solid #22c55e;
+            margin-bottom: 30px;
+            width: 100%;
+            max-width: 600px;
+        }
+        .header h1 { color: #22c55e; font-size: 28px; }
+        .header p { color: #94a3b8; margin-top: 5px; }
+        .now-serving {
+            background: #1e293b;
+            border: 2px solid #22c55e;
+            border-radius: 20px;
+            padding: 40px;
+            text-align: center;
+            width: 100%;
+            max-width: 600px;
+            margin-bottom: 20px;
+        }
+        .now-serving .label {
+            color: #94a3b8;
+            font-size: 16px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        .now-serving .token-num {
+            font-size: 100px;
+            font-weight: bold;
+            color: #22c55e;
+            line-height: 1;
+        }
+        .now-serving .patient-name {
+            color: #94a3b8;
+            font-size: 18px;
+            margin-top: 10px;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            width: 100%;
+            max-width: 600px;
+            margin-bottom: 20px;
+        }
+        .info-card {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+        .info-card .label {
+            color: #94a3b8;
+            font-size: 13px;
+            margin-bottom: 8px;
+        }
+        .info-card .value {
+            font-size: 36px;
+            font-weight: bold;
+            color: #f59e0b;
+        }
+        .info-card .unit {
+            color: #94a3b8;
+            font-size: 13px;
+            margin-top: 4px;
+        }
+        .check-section {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 20px;
+            width: 100%;
+            max-width: 600px;
+            margin-bottom: 20px;
+        }
+        .check-section h3 {
+            color: #94a3b8;
+            font-size: 14px;
+            margin-bottom: 12px;
+        }
+        .check-input {
+            display: flex;
+            gap: 10px;
+        }
+        input[type="number"] {
+            flex: 1;
+            padding: 10px 14px;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            color: white;
+            font-size: 14px;
+            outline: none;
+        }
+        input:focus { border-color: #22c55e; }
+        .btn-check {
+            padding: 10px 20px;
+            background: #22c55e;
+            color: #000;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .my-status {
+            margin-top: 12px;
+            padding: 12px;
+            border-radius: 8px;
+            display: none;
+            font-size: 14px;
+        }
+        .my-status.waiting {
+            background: #1d4ed833;
+            border: 1px solid #3b82f6;
+            color: #93c5fd;
+        }
+        .my-status.serving {
+            background: #16a34a33;
+            border: 1px solid #22c55e;
+            color: #86efac;
+        }
+        .my-status.served {
+            background: #47556933;
+            border: 1px solid #64748b;
+            color: #94a3b8;
+        }
+        .live-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: #16a34a33;
+            border: 1px solid #22c55e;
+            color: #22c55e;
+            padding: 4px 12px;
+            border-radius: 99px;
+            font-size: 12px;
+            margin-top: 8px;
+        }
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            background: #22c55e;
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+        .queue-scroll {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 20px;
+            width: 100%;
+            max-width: 600px;
+        }
+        .queue-scroll h3 {
+            color: #94a3b8;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+        .patient-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px;
+            border-radius: 8px;
+            margin-bottom: 6px;
+        }
+        .patient-row.current { background: #16a34a33; }
+        .patient-row.served { opacity: 0.4; }
+        .token-circle {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #334155;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+        .current .token-circle { background: #22c55e; color: #000; }
+        .empty { color: #475569; text-align: center; padding: 20px; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>🏥 QueueCure</h1>
+    <p>Patient Waiting Room</p>
+    <div class="live-badge">
+        <div class="live-dot"></div>
+        Live Updates
+    </div>
+</div>
+
+<div class="now-serving">
+    <div class="label">Now Serving</div>
+    <div class="token-num" id="currentToken">0</div>
+    <div class="patient-name" id="currentName">Waiting to start...</div>
+</div>
+
+<div class="info-grid">
+    <div class="info-card">
+        <div class="label">Patients Ahead</div>
+        <div class="value" id="ahead">0</div>
+        <div class="unit">in queue</div>
+    </div>
+    <div class="info-card">
+        <div class="label">Est. Wait Time</div>
+        <div class="value" id="waitTime">0</div>
+        <div class="unit">minutes</div>
+    </div>
+</div>
+
+<div class="check-section">
+    <h3>CHECK YOUR TOKEN STATUS</h3>
+    <div class="check-input">
+        <input type="number" id="myToken" placeholder="Enter your token number..." min="1" />
+        <button class="btn-check" onclick="checkMyToken()">Check</button>
+    </div>
+    <div class="my-status" id="myStatus"></div>
+</div>
+
+<div class="queue-scroll">
+    <h3>LIVE QUEUE</h3>
+    <div id="queueList">
+        <div class="empty">No patients in queue yet!</div>
+    </div>
+</div>
+
+<script>
+    const socket = io();
+    let currentState = null;
+    let lastToken = 0;
+
+    function speakToken(token, name) {
+    const msg = new SpeechSynthesisUtterance(
+        `Token number ${token}, ${name},  please move to consultation room`
+    );
+
+    msg.rate = 0.9;
+    msg.pitch = 1;
+    msg.volume = 2;
+    msg.lang = "en-US";
+
+    window.speechSynthesis.speak(msg);
+}
+
+   socket.on("queue_update", function(state) {
+    currentState = state;
+    updateUI(state);
+
+    if (state.current_token > lastToken && state.current_token > 0) {
+    const currentPatient = state.patients.find(
+        p => p.token === state.current_token
+    );
+
+    if (currentPatient) {
+        speakToken(state.current_token, currentPatient.name);
+    } else {
+        speakToken(state.current_token, "Patient");
+    }
+
+    lastToken = state.current_token;
+}
+});
+
+    function updateUI(state) {
+        // Current token
+        document.getElementById("currentToken").textContent =
+            state.current_token || 0;
+
+        // Current patient name
+        const currentPatient = state.patients.find(
+            p => p.token === state.current_token
+        );
+        document.getElementById("currentName").textContent =
+            currentPatient ? currentPatient.name : "Waiting to start...";
+
+        // Patients ahead — how many after current not yet served
+        const waiting = state.total_tokens - state.current_token;
+        document.getElementById("ahead").textContent = waiting;
+
+        // Estimated wait time
+        const waitTime = waiting * state.avg_time;
+        document.getElementById("waitTime").textContent = waitTime;
+
+        // Update queue list
+        const list = document.getElementById("queueList");
+        if (state.patients.length === 0) {
+            list.innerHTML = '<div class="empty">No patients yet!</div>';
+            return;
+        }
+
+        list.innerHTML = state.patients.map(p => {
+            let cls = "";
+            let statusText = "Waiting";
+            if (p.token < state.current_token) {
+                cls = "served";
+                statusText = "Served";
+            } else if (p.token === state.current_token) {
+                cls = "current";
+                statusText = "Now Serving";
+            }
+            return `
+                <div class="patient-row ${cls}">
+                    <div class="token-circle">${p.token}</div>
+                    <div>
+                        <div style="font-size:14px; font-weight:500">${p.name}</div>
+                        <div style="font-size:12px; color:#94a3b8">${statusText}</div>
+                    </div>
+                </div>
+            `;
+        }).join("");
+
+        // Refresh my token status if checked
+        const myTokenInput = document.getElementById("myToken").value;
+        if (myTokenInput) checkMyToken();
+    }
+
+    function checkMyToken() {
+        if (!currentState) return;
+        const myToken = parseInt(document.getElementById("myToken").value);
+        if (!myToken) return;
+
+        const statusDiv = document.getElementById("myStatus");
+        statusDiv.style.display = "block";
+
+        if (myToken > currentState.total_tokens) {
+            statusDiv.className = "my-status waiting";
+            statusDiv.textContent = "Token not found! Please check your number.";
+            return;
+        }
+
+        if (myToken < currentState.current_token) {
+            statusDiv.className = "my-status served";
+            statusDiv.textContent = "Your token has already been served!";
+        } else if (myToken === currentState.current_token) {
+            statusDiv.className = "my-status serving";
+            statusDiv.textContent = "Your turn now! Please go to the doctor.";
+        } else {
+            const ahead = myToken - currentState.current_token - 1;
+            const wait = (ahead + 1) * currentState.avg_time;
+            statusDiv.className = "my-status waiting";
+            statusDiv.textContent =
+                `${ahead} patient(s) ahead of you. Estimated wait: ${wait} minutes.`;
+        }
+    }
+</script>
+
+</body>
+</html>

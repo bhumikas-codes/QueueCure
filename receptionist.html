@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QueueCure - Receptionist</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #0f172a;
+            color: white;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            padding: 20px;
+            border-bottom: 2px solid #3b82f6;
+            margin-bottom: 30px;
+        }
+        .header h1 { color: #3b82f6; font-size: 28px; }
+        .header p { color: #94a3b8; margin-top: 5px; }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+        .stat-card .label {
+            color: #94a3b8;
+            font-size: 13px;
+            margin-bottom: 8px;
+        }
+        .stat-card .value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #3b82f6;
+        }
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .control-card {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 20px;
+        }
+        .control-card h3 {
+            color: #94a3b8;
+            font-size: 14px;
+            margin-bottom: 12px;
+        }
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 10px 14px;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            color: white;
+            font-size: 14px;
+            margin-bottom: 10px;
+            outline: none;
+        }
+        input:focus { border-color: #3b82f6; }
+        .btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .btn-blue {
+            background: #3b82f6;
+            color: white;
+        }
+        .btn-green {
+            background: #22c55e;
+            color: white;
+            font-size: 18px;
+            padding: 16px;
+        }
+        .btn:hover { opacity: 0.9; }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .queue-list {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 20px;
+        }
+        .queue-list h3 {
+            color: #94a3b8;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+        .patient-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            background: #0f172a;
+        }
+        .patient-item.served { opacity: 0.4; }
+        .patient-item.current { background: #1d4ed8; }
+        .token-badge {
+            background: #3b82f6;
+            color: white;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+        .current .token-badge { background: #22c55e; }
+        .served .token-badge { background: #475569; }
+        .empty { color: #475569; text-align: center; padding: 20px; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>🏥 QueueCure — Receptionist Panel</h1>
+    <p>Manage patient queue in real time</p>
+</div>
+
+<div class="stats">
+    <div class="stat-card">
+        <div class="label">Current Token</div>
+        <div class="value" id="currentToken">0</div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Waiting</div>
+        <div class="value" id="waitingCount">0</div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Total Today</div>
+        <div class="value" id="totalTokens">0</div>
+    </div>
+</div>
+
+<div class="controls">
+    <div class="control-card">
+        <h3>ADD NEW PATIENT</h3>
+        <input type="text" id="patientName" placeholder="Patient name..." />
+        <button class="btn btn-blue" onclick="addPatient()">
+            + Add to Queue
+        </button>
+    </div>
+    <div class="control-card">
+        <h3>AVG CONSULTATION TIME</h3>
+        <input type="number" id="avgTime" placeholder="Minutes..." min="1" max="60" />
+        <button class="btn btn-blue" onclick="setAvgTime()">
+            Update Time
+        </button>
+    </div>
+</div>
+
+<button class="btn btn-green" onclick="callNext()" id="callNextBtn">
+    📢 Call Next Token
+</button>
+
+<br/><br/>
+
+<div class="queue-list">
+    <h3>TODAY'S QUEUE</h3>
+    <div id="queueList">
+        <div class="empty">No patients yet. Add first patient above!</div>
+    </div>
+</div>
+
+<script>
+    const socket = io();
+
+    // When server sends queue update
+    socket.on("queue_update", function(state) {
+        updateUI(state);
+    });
+
+    function updateUI(state) {
+        document.getElementById("currentToken").textContent = state.current_token;
+        document.getElementById("totalTokens").textContent = state.total_tokens;
+
+        const waiting = state.total_tokens - state.current_token;
+        document.getElementById("waitingCount").textContent = waiting;
+
+        const btn = document.getElementById("callNextBtn");
+        btn.disabled = state.current_token >= state.total_tokens;
+
+        // Update queue list
+        const list = document.getElementById("queueList");
+        if (state.patients.length === 0) {
+            list.innerHTML = '<div class="empty">No patients yet!</div>';
+            return;
+        }
+
+        list.innerHTML = state.patients.map(p => {
+            let cls = "";
+            if (p.token < state.current_token) cls = "served";
+            else if (p.token === state.current_token) cls = "current";
+
+            return `
+                <div class="patient-item ${cls}">
+                    <div class="token-badge">${p.token}</div>
+                    <div>
+                        <div style="font-weight:500">${p.name}</div>
+                        <div style="font-size:12px; color:#94a3b8">
+                            ${p.token < state.current_token ? "Served" :
+                              p.token === state.current_token ? "Currently serving" :
+                              "Waiting"}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join("");
+    }
+
+    function addPatient() {
+        const name = document.getElementById("patientName").value.trim();
+        if (!name) { alert("Please enter patient name!"); return; }
+        socket.emit("add_patient", { name: name });
+        document.getElementById("patientName").value = "";
+    }
+
+    function callNext() {
+        socket.emit("call_next");
+    }
+
+    function setAvgTime() {
+        const time = document.getElementById("avgTime").value;
+        if (!time) { alert("Please enter time!"); return; }
+        socket.emit("set_avg_time", { time: time });
+        document.getElementById("avgTime").value = "";
+    }
+
+    // Press Enter to add patient
+    document.getElementById("patientName").addEventListener("keypress", function(e) {
+        if (e.key === "Enter") addPatient();
+    });
+</script>
+
+</body>
+</html>

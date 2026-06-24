@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>QueueCure</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial;
+            background: linear-gradient(135deg, #0f172a, #1e3a8a);
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .container {
+            text-align: center;
+            width: 700px;
+        }
+
+        h1 {
+            font-size: 52px;
+            color: #3b82f6;
+            margin-bottom: 10px;
+        }
+
+        p {
+            color: #cbd5e1;
+            font-size: 20px;
+            margin-bottom: 50px;
+        }
+
+        .cards {
+            display: flex;
+            gap: 30px;
+            justify-content: center;
+        }
+
+        .card {
+            background: #1e293b;
+            padding: 40px;
+            width: 250px;
+            border-radius: 16px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.3);
+        }
+
+        .card h2 {
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 14px 24px;
+            background: #3b82f6;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+
+        .btn:hover {
+            background: #2563eb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏥 QueueCure</h1>
+        <p>Smart Hospital Queue Management System</p>
+
+        <div class="cards">
+            <div class="card">
+                <h2>Patient</h2>
+                <p>Take token and track queue live</p>
+                <a href="/patient" class="btn">Open Patient Panel</a>
+            </div>
+
+            <div class="card">
+                <h2>Receptionist</h2>
+                <p>Manage patient queue securely</p>
+                <a href="/login" class="btn">Reception Login</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
